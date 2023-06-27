@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TextureLoader } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 window.Webflow ||= [];
 window.Webflow.push(() => {
@@ -15,11 +15,14 @@ function init3D() {
   const viewport = document.querySelector('[data-3d="c"]');
   // console.log(viewport);
 
-  // create scened and renderer and camera
+  // create scene, renderer, and camera
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer();
+  const renderer = new THREE.WebGLRenderer({ alpha: true }); // Pass { alpha: true } to enable transparency
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 0); // Set background color to black with opacity 0
+  renderer.setClearAlpha(0); // Set opacity of background color to 0
+  renderer.autoClear = false; // Disable automatic clearing of the rendering buffer
   viewport.appendChild(renderer.domElement);
 
   // add controls
@@ -28,9 +31,7 @@ function init3D() {
   // controls.enableDamping = true;
   // controls.dampingFactor = 0.05;
 
-  camera.position.z = 3;
-
-  // declaring the bone ouside the load
+  // declaring the bone outside the load
   let neckBone = null;
 
   // animation setup
@@ -63,6 +64,7 @@ function init3D() {
       neckBone.rotation.x = -mouse.y;
     }
 
+    renderer.clear();
     renderer.render(scene, camera);
   }
 
@@ -74,18 +76,15 @@ function init3D() {
     const robot = data.robot.scene;
     const { animations } = data.robot;
 
-    // console.log(animations);
-
     robot.traverse((child) => {
       if (child.isMesh) {
         child.material = new THREE.MeshBasicMaterial();
         //child.material.wireframe = true;
         child.material.map = data.texture;
       }
-
+      console.log(child.name);
       if (child.isBone) {
-        // console.log(child.name);
-        if (child.name === 'bb_neck') {
+        if (child.name === 'mixamorigHead') {
           neckBone = child;
         }
       }
@@ -98,17 +97,57 @@ function init3D() {
 
     robot.position.y = -1;
     scene.add(robot);
+    console.log(robot);
+    robot.children[0].children[2].children[0].material.color.setHex(0xca4639);
+    robot.children[0].children[2].children[1].material.color.setHex(0xaabfe8);
+
+    // Set linear gradient texture for the desired part
+    robot.children[0].children[2].children[2].material.map = createLinearGradientTexture();
+
+    robot.children[0].children[2].children[3].material.color.setHex(0x68ed4c);
+    robot.children[0].children[2].children[4].material.color.setHex(0x68ed4c);
+    robot.children[0].children[2].children[5].children[0].material.color.setHex(0xeada2d);
+    robot.children[0].children[2].children[5].children[1].material.color.setHex(0xffffff);
+    robot.children[0].children[2].children[6].material.color.setHex(0xeada2d);
+    //robot.children[0].children[2].children[7].children[0].material.color.setHex(0xca4639);
+
+    // Position camera in front of the model
+    const modelBoundingBox = new THREE.Box3().setFromObject(robot);
+    const modelSize = modelBoundingBox.getSize(new THREE.Vector3());
+    const modelCenter = modelBoundingBox.getCenter(new THREE.Vector3());
+
+    const modelDistance = Math.max(modelSize.x, modelSize.y, modelSize.z) * 1.5;
+    const cameraPosition = modelCenter.clone().add(new THREE.Vector3(0, 0, modelDistance));
+
+    camera.position.copy(cameraPosition);
+    camera.lookAt(modelCenter);
   });
+}
+
+function createLinearGradientTexture() {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, '#eaba2d');
+  gradient.addColorStop(1, '#ffffff');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  texture.flipY = false;
+
+  return texture;
 }
 
 /* Loader Functions */
 async function load() {
   const robot = await loadModel(
-    'https://uploads-ssl.webflow.com/648c93d1de00e945bb8365a3/649849d0e789129d13692b36_robot.v3-live.glb.txt'
+    'https://uploads-ssl.webflow.com/648c93d1de00e945bb8365a3/649ade4a5da4e011fb64b2f3_scene.glb.txt'
   );
 
   const texture = await loadTexture(
-    'https://uploads-ssl.webflow.com/648c93d1de00e945bb8365a3/649811ff6a5e21b5fd717436_robot-texture.png'
+    'https://uploads-ssl.webflow.com/648c93d1de00e945bb8365a3/649b1f46d3b1b2a04077a3af_Astronauta_Buono_4k-Paint-Brush_Normal.png'
   );
 
   return { robot, texture };
